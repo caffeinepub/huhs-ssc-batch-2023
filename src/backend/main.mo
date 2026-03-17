@@ -161,7 +161,6 @@ actor {
       };
     };
   };
-
   // Claim admin role - first caller becomes admin (one-time only)
   public shared ({ caller }) func claimAdminRole(_userSecret : Text) : async Bool {
     if (adminPrincipal != null) {
