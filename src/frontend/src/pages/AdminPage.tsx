@@ -34,9 +34,15 @@ import {
   Shield,
   Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import type { Post } from "../backend.d";
+import type {
+  Friend,
+  GalleryEvent,
+  PDFDocument,
+  Post,
+  YouTubeVideo,
+} from "../backend.d";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useClaimAdmin,
@@ -56,9 +62,15 @@ import {
   useGetAllPDFs,
   useGetAllPosts,
   useGetAllVideos,
+  useGetSocialLinks,
   useIsAdmin,
   useResetAndClaimAdmin,
+  useUpdateFriend,
+  useUpdateGalleryEvent,
+  useUpdatePDF,
   useUpdatePost,
+  useUpdateSocialLinks,
+  useUpdateVideo,
 } from "../hooks/useQueries";
 import { useRouter } from "../router";
 
@@ -306,13 +318,32 @@ function FriendsTab() {
   const { data: friends = [] } = useGetAllFriends();
   const createFriend = useCreateFriend();
   const deleteFriend = useDeleteFriend();
+  const updateFriend = useUpdateFriend();
   const [open, setOpen] = useState(false);
+  const [editFriend, setEditFriend] = useState<Friend | null>(null);
   const [form, setForm] = useState({
     name: "",
     photoUrl: "",
     mobile: "",
     facebookId: "",
   });
+
+  const openNew = () => {
+    setEditFriend(null);
+    setForm({ name: "", photoUrl: "", mobile: "", facebookId: "" });
+    setOpen(true);
+  };
+
+  const openEdit = (f: Friend) => {
+    setEditFriend(f);
+    setForm({
+      name: f.name,
+      photoUrl: f.photoUrl,
+      mobile: f.mobile,
+      facebookId: f.facebookId,
+    });
+    setOpen(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -321,12 +352,17 @@ function FriendsTab() {
       return;
     }
     try {
-      await createFriend.mutateAsync(form);
-      toast.success("Friend added!");
+      if (editFriend) {
+        await updateFriend.mutateAsync(form);
+        toast.success("Friend updated!");
+      } else {
+        await createFriend.mutateAsync(form);
+        toast.success("Friend added!");
+      }
       setForm({ name: "", photoUrl: "", mobile: "", facebookId: "" });
       setOpen(false);
     } catch (err: any) {
-      toast.error(err?.message ?? "Failed to add friend.");
+      toast.error(err?.message ?? "Failed.");
     }
   };
 
@@ -337,7 +373,7 @@ function FriendsTab() {
         <Button
           size="sm"
           className="bg-primary hover:bg-primary/90 gap-1"
-          onClick={() => setOpen(true)}
+          onClick={openNew}
           data-ocid="admin.friends.open_modal_button"
         >
           <Plus className="w-4 h-4" /> Add Friend
@@ -350,7 +386,7 @@ function FriendsTab() {
               <TableHead>Name</TableHead>
               <TableHead>Mobile</TableHead>
               <TableHead>Facebook</TableHead>
-              <TableHead className="w-16">Del</TableHead>
+              <TableHead className="w-24">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -362,20 +398,31 @@ function FriendsTab() {
                   {f.facebookId}
                 </TableCell>
                 <TableCell>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="w-7 h-7 text-destructive"
-                    onClick={async () => {
-                      if (confirm("Delete?")) {
-                        await deleteFriend.mutateAsync(f.name);
-                        toast.success("Deleted.");
-                      }
-                    }}
-                    data-ocid={`admin.friends.delete_button.${i + 1}`}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="w-7 h-7"
+                      onClick={() => openEdit(f)}
+                      data-ocid={`admin.friends.edit_button.${i + 1}`}
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="w-7 h-7 text-destructive"
+                      onClick={async () => {
+                        if (confirm("Delete?")) {
+                          await deleteFriend.mutateAsync(f.name);
+                          toast.success("Deleted.");
+                        }
+                      }}
+                      data-ocid={`admin.friends.delete_button.${i + 1}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -385,7 +432,9 @@ function FriendsTab() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent data-ocid="admin.friends.dialog">
           <DialogHeader>
-            <DialogTitle>Add Friend</DialogTitle>
+            <DialogTitle>
+              {editFriend ? "Edit Friend" : "Add Friend"}
+            </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
@@ -396,6 +445,8 @@ function FriendsTab() {
                   setForm((f) => ({ ...f, name: e.target.value }))
                 }
                 placeholder="Full name"
+                readOnly={!!editFriend}
+                disabled={!!editFriend}
                 data-ocid="admin.friends.name.input"
               />
             </div>
@@ -444,10 +495,14 @@ function FriendsTab() {
               <Button
                 type="submit"
                 className="bg-primary hover:bg-primary/90"
-                disabled={createFriend.isPending}
+                disabled={createFriend.isPending || updateFriend.isPending}
                 data-ocid="admin.friends.submit_button"
               >
-                {createFriend.isPending ? "Adding..." : "Add"}
+                {createFriend.isPending || updateFriend.isPending
+                  ? "Saving..."
+                  : editFriend
+                    ? "Update"
+                    : "Add"}
               </Button>
             </div>
           </form>
@@ -461,8 +516,22 @@ function GalleryTab() {
   const { data: events = [] } = useGetAllGalleryEvents();
   const createEvent = useCreateGalleryEvent();
   const deleteEvent = useDeleteGalleryEvent();
+  const updateEvent = useUpdateGalleryEvent();
   const [open, setOpen] = useState(false);
+  const [editEvent, setEditEvent] = useState<GalleryEvent | null>(null);
   const [form, setForm] = useState({ eventName: "", imageUrls: "" });
+
+  const openNew = () => {
+    setEditEvent(null);
+    setForm({ eventName: "", imageUrls: "" });
+    setOpen(true);
+  };
+
+  const openEdit = (ev: GalleryEvent) => {
+    setEditEvent(ev);
+    setForm({ eventName: ev.eventName, imageUrls: ev.imageUrls.join("\n") });
+    setOpen(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -475,8 +544,13 @@ function GalleryTab() {
       .map((u) => u.trim())
       .filter(Boolean);
     try {
-      await createEvent.mutateAsync({ eventName: form.eventName, imageUrls });
-      toast.success("Event created!");
+      if (editEvent) {
+        await updateEvent.mutateAsync({ eventName: form.eventName, imageUrls });
+        toast.success("Event updated!");
+      } else {
+        await createEvent.mutateAsync({ eventName: form.eventName, imageUrls });
+        toast.success("Event created!");
+      }
       setForm({ eventName: "", imageUrls: "" });
       setOpen(false);
     } catch (err: any) {
@@ -493,7 +567,7 @@ function GalleryTab() {
         <Button
           size="sm"
           className="bg-primary hover:bg-primary/90 gap-1"
-          onClick={() => setOpen(true)}
+          onClick={openNew}
           data-ocid="admin.gallery.open_modal_button"
         >
           <Plus className="w-4 h-4" /> Add Event
@@ -512,27 +586,39 @@ function GalleryTab() {
                 {ev.imageUrls.length} images
               </p>
             </div>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="text-destructive"
-              onClick={async () => {
-                if (confirm("Delete?")) {
-                  await deleteEvent.mutateAsync(ev.eventName);
-                  toast.success("Deleted.");
-                }
-              }}
-              data-ocid={`admin.gallery.delete_button.${i + 1}`}
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            <div className="flex gap-1">
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => openEdit(ev)}
+                data-ocid={`admin.gallery.edit_button.${i + 1}`}
+              >
+                <Edit className="w-4 h-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="text-destructive"
+                onClick={async () => {
+                  if (confirm("Delete?")) {
+                    await deleteEvent.mutateAsync(ev.eventName);
+                    toast.success("Deleted.");
+                  }
+                }}
+                data-ocid={`admin.gallery.delete_button.${i + 1}`}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         ))}
       </div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent data-ocid="admin.gallery.dialog">
           <DialogHeader>
-            <DialogTitle>Add Gallery Event</DialogTitle>
+            <DialogTitle>
+              {editEvent ? "Edit Gallery Event" : "Add Gallery Event"}
+            </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
@@ -543,6 +629,8 @@ function GalleryTab() {
                   setForm((f) => ({ ...f, eventName: e.target.value }))
                 }
                 placeholder="e.g. Farewell 2023"
+                readOnly={!!editEvent}
+                disabled={!!editEvent}
                 data-ocid="admin.gallery.name.input"
               />
             </div>
@@ -570,10 +658,14 @@ function GalleryTab() {
               <Button
                 type="submit"
                 className="bg-primary hover:bg-primary/90"
-                disabled={createEvent.isPending}
+                disabled={createEvent.isPending || updateEvent.isPending}
                 data-ocid="admin.gallery.submit_button"
               >
-                {createEvent.isPending ? "Creating..." : "Create"}
+                {createEvent.isPending || updateEvent.isPending
+                  ? "Saving..."
+                  : editEvent
+                    ? "Update"
+                    : "Create"}
               </Button>
             </div>
           </form>
@@ -587,12 +679,30 @@ function VideosTab() {
   const { data: videos = [] } = useGetAllVideos();
   const createVideo = useCreateVideo();
   const deleteVideo = useDeleteVideo();
+  const updateVideo = useUpdateVideo();
   const [open, setOpen] = useState(false);
+  const [editVideo, setEditVideo] = useState<YouTubeVideo | null>(null);
   const [form, setForm] = useState({
     title: "",
     youtubeUrl: "",
     description: "",
   });
+
+  const openNew = () => {
+    setEditVideo(null);
+    setForm({ title: "", youtubeUrl: "", description: "" });
+    setOpen(true);
+  };
+
+  const openEdit = (v: YouTubeVideo) => {
+    setEditVideo(v);
+    setForm({
+      title: v.title,
+      youtubeUrl: v.youtubeUrl,
+      description: v.description,
+    });
+    setOpen(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -601,8 +711,13 @@ function VideosTab() {
       return;
     }
     try {
-      await createVideo.mutateAsync(form);
-      toast.success("Video added!");
+      if (editVideo) {
+        await updateVideo.mutateAsync(form);
+        toast.success("Video updated!");
+      } else {
+        await createVideo.mutateAsync(form);
+        toast.success("Video added!");
+      }
       setForm({ title: "", youtubeUrl: "", description: "" });
       setOpen(false);
     } catch (err: any) {
@@ -617,7 +732,7 @@ function VideosTab() {
         <Button
           size="sm"
           className="bg-primary hover:bg-primary/90 gap-1"
-          onClick={() => setOpen(true)}
+          onClick={openNew}
           data-ocid="admin.videos.open_modal_button"
         >
           <Plus className="w-4 h-4" /> Add Video
@@ -636,27 +751,39 @@ function VideosTab() {
                 {v.youtubeUrl}
               </p>
             </div>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="text-destructive ml-2"
-              onClick={async () => {
-                if (confirm("Delete?")) {
-                  await deleteVideo.mutateAsync(v.title);
-                  toast.success("Deleted.");
-                }
-              }}
-              data-ocid={`admin.videos.delete_button.${i + 1}`}
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            <div className="flex gap-1 ml-2">
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => openEdit(v)}
+                data-ocid={`admin.videos.edit_button.${i + 1}`}
+              >
+                <Edit className="w-4 h-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="text-destructive"
+                onClick={async () => {
+                  if (confirm("Delete?")) {
+                    await deleteVideo.mutateAsync(v.title);
+                    toast.success("Deleted.");
+                  }
+                }}
+                data-ocid={`admin.videos.delete_button.${i + 1}`}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         ))}
       </div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent data-ocid="admin.videos.dialog">
           <DialogHeader>
-            <DialogTitle>Add YouTube Video</DialogTitle>
+            <DialogTitle>
+              {editVideo ? "Edit YouTube Video" : "Add YouTube Video"}
+            </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
@@ -667,6 +794,8 @@ function VideosTab() {
                   setForm((f) => ({ ...f, title: e.target.value }))
                 }
                 placeholder="Video title"
+                readOnly={!!editVideo}
+                disabled={!!editVideo}
                 data-ocid="admin.videos.title.input"
               />
             </div>
@@ -705,10 +834,14 @@ function VideosTab() {
               <Button
                 type="submit"
                 className="bg-primary hover:bg-primary/90"
-                disabled={createVideo.isPending}
+                disabled={createVideo.isPending || updateVideo.isPending}
                 data-ocid="admin.videos.submit_button"
               >
-                {createVideo.isPending ? "Adding..." : "Add"}
+                {createVideo.isPending || updateVideo.isPending
+                  ? "Saving..."
+                  : editVideo
+                    ? "Update"
+                    : "Add"}
               </Button>
             </div>
           </form>
@@ -722,8 +855,22 @@ function PDFsTab() {
   const { data: pdfs = [] } = useGetAllPDFs();
   const createPDF = useCreatePDF();
   const deletePDF = useDeletePDF();
+  const updatePDF = useUpdatePDF();
   const [open, setOpen] = useState(false);
+  const [editPDF, setEditPDF] = useState<PDFDocument | null>(null);
   const [form, setForm] = useState({ title: "", fileUrl: "", description: "" });
+
+  const openNew = () => {
+    setEditPDF(null);
+    setForm({ title: "", fileUrl: "", description: "" });
+    setOpen(true);
+  };
+
+  const openEdit = (p: PDFDocument) => {
+    setEditPDF(p);
+    setForm({ title: p.title, fileUrl: p.fileUrl, description: p.description });
+    setOpen(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -732,8 +879,13 @@ function PDFsTab() {
       return;
     }
     try {
-      await createPDF.mutateAsync(form);
-      toast.success("PDF added!");
+      if (editPDF) {
+        await updatePDF.mutateAsync(form);
+        toast.success("PDF updated!");
+      } else {
+        await createPDF.mutateAsync(form);
+        toast.success("PDF added!");
+      }
       setForm({ title: "", fileUrl: "", description: "" });
       setOpen(false);
     } catch (err: any) {
@@ -748,7 +900,7 @@ function PDFsTab() {
         <Button
           size="sm"
           className="bg-primary hover:bg-primary/90 gap-1"
-          onClick={() => setOpen(true)}
+          onClick={openNew}
           data-ocid="admin.pdfs.open_modal_button"
         >
           <Plus className="w-4 h-4" /> Add PDF
@@ -767,27 +919,39 @@ function PDFsTab() {
                 {p.description}
               </p>
             </div>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="text-destructive ml-2"
-              onClick={async () => {
-                if (confirm("Delete?")) {
-                  await deletePDF.mutateAsync(p.title);
-                  toast.success("Deleted.");
-                }
-              }}
-              data-ocid={`admin.pdfs.delete_button.${i + 1}`}
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            <div className="flex gap-1 ml-2">
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => openEdit(p)}
+                data-ocid={`admin.pdfs.edit_button.${i + 1}`}
+              >
+                <Edit className="w-4 h-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="text-destructive"
+                onClick={async () => {
+                  if (confirm("Delete?")) {
+                    await deletePDF.mutateAsync(p.title);
+                    toast.success("Deleted.");
+                  }
+                }}
+                data-ocid={`admin.pdfs.delete_button.${i + 1}`}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         ))}
       </div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent data-ocid="admin.pdfs.dialog">
           <DialogHeader>
-            <DialogTitle>Add PDF Document</DialogTitle>
+            <DialogTitle>
+              {editPDF ? "Edit PDF Document" : "Add PDF Document"}
+            </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
@@ -798,6 +962,8 @@ function PDFsTab() {
                   setForm((f) => ({ ...f, title: e.target.value }))
                 }
                 placeholder="Document title"
+                readOnly={!!editPDF}
+                disabled={!!editPDF}
                 data-ocid="admin.pdfs.title.input"
               />
             </div>
@@ -836,15 +1002,100 @@ function PDFsTab() {
               <Button
                 type="submit"
                 className="bg-primary hover:bg-primary/90"
-                disabled={createPDF.isPending}
+                disabled={createPDF.isPending || updatePDF.isPending}
                 data-ocid="admin.pdfs.submit_button"
               >
-                {createPDF.isPending ? "Adding..." : "Add"}
+                {createPDF.isPending || updatePDF.isPending
+                  ? "Saving..."
+                  : editPDF
+                    ? "Update"
+                    : "Add"}
               </Button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function SocialLinksTab() {
+  const { data: links } = useGetSocialLinks();
+  const updateLinks = useUpdateSocialLinks();
+  const [form, setForm] = useState({
+    facebook: "",
+    youtube: "",
+    instagram: "",
+  });
+
+  useEffect(() => {
+    if (links)
+      setForm({
+        facebook: links.facebook,
+        youtube: links.youtube,
+        instagram: links.instagram,
+      });
+  }, [links]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await updateLinks.mutateAsync(form);
+      toast.success("Social links updated!");
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to update.");
+    }
+  };
+
+  return (
+    <div>
+      <h2 className="text-lg font-semibold mb-4">Social Media Links</h2>
+      <p className="text-sm text-muted-foreground mb-6">
+        Set the URLs for social media icons in the site footer and social page.
+      </p>
+      <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
+        <div>
+          <Label>Facebook URL</Label>
+          <Input
+            value={form.facebook}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, facebook: e.target.value }))
+            }
+            placeholder="https://facebook.com/groups/..."
+            data-ocid="admin.social.facebook.input"
+          />
+        </div>
+        <div>
+          <Label>YouTube URL</Label>
+          <Input
+            value={form.youtube}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, youtube: e.target.value }))
+            }
+            placeholder="https://youtube.com/@..."
+            data-ocid="admin.social.youtube.input"
+          />
+        </div>
+        <div>
+          <Label>Instagram URL</Label>
+          <Input
+            value={form.instagram}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, instagram: e.target.value }))
+            }
+            placeholder="https://instagram.com/..."
+            data-ocid="admin.social.instagram.input"
+          />
+        </div>
+        <Button
+          type="submit"
+          className="bg-primary hover:bg-primary/90"
+          disabled={updateLinks.isPending}
+          data-ocid="admin.social.submit_button"
+        >
+          {updateLinks.isPending ? "Saving..." : "Save Links"}
+        </Button>
+      </form>
     </div>
   );
 }
@@ -899,7 +1150,6 @@ export default function AdminPage() {
         toast.success("Admin access granted! Refreshing...");
         setTimeout(() => window.location.reload(), 1000);
       } else {
-        // Admin already assigned -- show reset form
         setShowResetForm(true);
       }
     } catch {
@@ -932,74 +1182,58 @@ export default function AdminPage() {
         className="max-w-2xl mx-auto px-4 py-16 text-center"
         data-ocid="admin.access.error_state"
       >
-        <Shield className="w-16 h-16 mx-auto text-destructive mb-5" />
+        <Shield className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
         <h1 className="text-2xl font-bold text-foreground mb-2">
-          Access Denied
+          Admin Access Required
         </h1>
-        <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-          You are not currently assigned as admin. Click below to claim access,
-          or use the reset code if admin was already assigned to another
-          session.
-        </p>
 
         {!showResetForm ? (
-          <div className="flex flex-col items-center gap-3">
+          <div>
+            <p className="text-muted-foreground mb-6">
+              You need admin privileges to access this page.
+            </p>
             <Button
               onClick={handleClaimAdmin}
+              className="bg-primary hover:bg-primary/90"
               disabled={claimAdmin.isPending}
-              className="bg-primary hover:bg-primary/90 px-8"
-              data-ocid="admin.claim.primary_button"
+              data-ocid="admin.claim.button"
             >
               {claimAdmin.isPending ? "Claiming..." : "Claim Admin Access"}
             </Button>
             <button
               type="button"
-              className="text-sm text-muted-foreground hover:text-primary underline underline-offset-4 transition-colors"
+              className="mt-3 block mx-auto text-sm text-muted-foreground hover:text-primary underline underline-offset-4 transition-colors"
               onClick={() => setShowResetForm(true)}
             >
-              Admin already assigned? Use reset code
+              Admin may already be assigned? Reset here
             </button>
-            <a
-              href="https://caffeine.ai"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition-colors"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              Open Caffeine Dashboard
-            </a>
           </div>
         ) : (
           <div className="max-w-sm mx-auto">
-            <div className="bg-muted/50 border border-border rounded-xl p-5 text-left">
-              <div className="flex items-center gap-2 mb-3">
-                <KeyRound className="w-4 h-4 text-primary" />
-                <p className="font-semibold text-sm">Reset Admin Access</p>
-              </div>
-              <p className="text-xs text-muted-foreground mb-4">
-                Enter the secret reset code to clear the existing admin
-                assignment and claim admin for your current session.
-              </p>
-              <form onSubmit={handleResetAndClaim} className="space-y-3">
+            <p className="text-muted-foreground mb-4">
+              Enter the reset code to reclaim admin access.
+            </p>
+            <form onSubmit={handleResetAndClaim} className="space-y-3">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                 <Input
-                  type="password"
                   value={resetCode}
                   onChange={(e) => setResetCode(e.target.value)}
-                  placeholder="Enter reset code"
-                  data-ocid="admin.reset.code_input"
+                  placeholder="HUHS-ADMIN-RESET-XXXX"
+                  data-ocid="admin.reset.input"
                 />
-                <Button
-                  type="submit"
-                  className="w-full bg-primary hover:bg-primary/90"
-                  disabled={resetAndClaim.isPending}
-                  data-ocid="admin.reset.submit_button"
-                >
-                  {resetAndClaim.isPending
-                    ? "Resetting..."
-                    : "Reset & Claim Admin"}
-                </Button>
-              </form>
-            </div>
+              </div>
+              <Button
+                type="submit"
+                className="w-full bg-primary hover:bg-primary/90"
+                disabled={resetAndClaim.isPending}
+                data-ocid="admin.reset.submit_button"
+              >
+                {resetAndClaim.isPending
+                  ? "Resetting..."
+                  : "Reset & Claim Admin"}
+              </Button>
+            </form>
             <button
               type="button"
               className="mt-3 text-sm text-muted-foreground hover:text-primary underline underline-offset-4 transition-colors"
@@ -1064,6 +1298,9 @@ export default function AdminPage() {
             <TabsTrigger value="pdfs" data-ocid="admin.pdfs.tab">
               PDFs
             </TabsTrigger>
+            <TabsTrigger value="social" data-ocid="admin.social.tab">
+              Social Links
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="posts">
             <PostsTab />
@@ -1079,6 +1316,9 @@ export default function AdminPage() {
           </TabsContent>
           <TabsContent value="pdfs">
             <PDFsTab />
+          </TabsContent>
+          <TabsContent value="social">
+            <SocialLinksTab />
           </TabsContent>
         </Tabs>
       </div>

@@ -76,8 +76,8 @@ export default function Header({
             <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary flex items-center justify-center">
               <GraduationCap className="w-5 h-5 text-primary-foreground" />
             </div>
-            <div className="hidden sm:block text-left min-w-0">
-              <p className="text-sm font-semibold text-foreground leading-tight truncate max-w-[200px] lg:max-w-none">
+            <div className="block text-left min-w-0 max-w-[140px] sm:max-w-[200px] lg:max-w-none">
+              <p className="text-xs sm:text-sm font-semibold text-foreground leading-tight truncate">
                 Harishchar Union High School
               </p>
               <p className="text-xs text-muted-foreground leading-tight">

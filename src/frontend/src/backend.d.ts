@@ -52,6 +52,11 @@ export interface UserProfile {
     name: string;
     batch: string;
 }
+export interface SocialLinks {
+    facebook: string;
+    youtube: string;
+    instagram: string;
+}
 export enum UserRole {
     admin = "admin",
     user = "user",
@@ -84,6 +89,7 @@ export interface backendInterface {
     getCommentsByPost(postId: string): Promise<Array<Comment>>;
     getLikeCount(postId: string): Promise<bigint>;
     getPostBySlug(slug: string): Promise<Post | null>;
+    getSocialLinks(): Promise<SocialLinks>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     getVisitorCount(): Promise<bigint>;
     incrementVisitorCount(): Promise<bigint>;
@@ -99,5 +105,6 @@ export interface backendInterface {
     updateGalleryEvent(eventName: string, imageUrls: Array<string>): Promise<void>;
     updatePDFDocument(title: string, fileUrl: string, description: string): Promise<void>;
     updatePost(slug: string, title: string, body: string, categoryId: string, tags: Array<string>): Promise<void>;
+    updateSocialLinks(facebook: string, youtube: string, instagram: string): Promise<void>;
     updateYouTubeVideo(title: string, youtubeUrl: string, description: string): Promise<void>;
 }

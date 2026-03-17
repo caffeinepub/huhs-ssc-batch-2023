@@ -1,4 +1,5 @@
 import { Facebook, Instagram, Twitter, Youtube } from "lucide-react";
+import { useGetSocialLinks } from "../hooks/useQueries";
 import { useRouter } from "../router";
 
 const GALLERY_IMAGES = [
@@ -14,6 +15,7 @@ export default function Footer() {
   const { navigate } = useRouter();
   const year = new Date().getFullYear();
   const hostname = encodeURIComponent(window.location.hostname);
+  const { data: socialLinks } = useGetSocialLinks();
 
   return (
     <footer className="footer-gradient text-white mt-16">
@@ -78,17 +80,17 @@ export default function Footer() {
               {[
                 {
                   icon: Facebook,
-                  href: "https://facebook.com",
+                  href: socialLinks?.facebook || "https://facebook.com",
                   label: "Facebook",
                 },
                 {
                   icon: Instagram,
-                  href: "https://instagram.com",
+                  href: socialLinks?.instagram || "https://instagram.com",
                   label: "Instagram",
                 },
                 {
                   icon: Youtube,
-                  href: "https://youtube.com",
+                  href: socialLinks?.youtube || "https://youtube.com",
                   label: "YouTube",
                 },
                 {

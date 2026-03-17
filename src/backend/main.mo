@@ -68,6 +68,26 @@ actor {
     description : Text;
   };
 
+  type SocialLinks = {
+    facebook : Text;
+    youtube : Text;
+    instagram : Text;
+  };
+
+  // ── Stable storage (survives upgrades) ──────────────────────────────
+  var postsStable : [(Text, Post)] = [];
+  var commentsStable : [(Text, Comment)] = [];
+  var categoriesStable : [(Text, Category)] = [];
+  var friendsStable : [(Text, Friend)] = [];
+  var galleryEventsStable : [(Text, GalleryEvent)] = [];
+  var youtubeVideosStable : [(Text, YouTubeVideo)] = [];
+  var pdfDocumentsStable : [(Text, PDFDocument)] = [];
+  var postLikesStable : [(Text, [Principal])] = [];
+  var userProfilesStable : [(Principal, UserProfile)] = [];
+  var visitorCount : Nat = 0;
+  var socialLinks : SocialLinks = { facebook = ""; youtube = ""; instagram = "" };
+
+  // ── Working (non-stable) Maps ────────────────────────────────────────
   let userProfiles = Map.empty<Principal, UserProfile>();
   let posts = Map.empty<Text, Post>();
   let comments = Map.empty<Text, Comment>();
@@ -77,7 +97,40 @@ actor {
   let youtubeVideos = Map.empty<Text, YouTubeVideo>();
   let pdfDocuments = Map.empty<Text, PDFDocument>();
   let postLikes = Map.empty<Text, [Principal]>();
-  var visitorCount = 0;
+
+  // ── Upgrade hooks ────────────────────────────────────────────────────
+  system func preupgrade() {
+    postsStable := posts.entries().toArray();
+    commentsStable := comments.entries().toArray();
+    categoriesStable := categories.entries().toArray();
+    friendsStable := friends.entries().toArray();
+    galleryEventsStable := galleryEvents.entries().toArray();
+    youtubeVideosStable := youtubeVideos.entries().toArray();
+    pdfDocumentsStable := pdfDocuments.entries().toArray();
+    postLikesStable := postLikes.entries().toArray();
+    userProfilesStable := userProfiles.entries().toArray();
+  };
+
+  system func postupgrade() {
+    for ((k, v) in postsStable.vals()) { posts.add(k, v) };
+    for ((k, v) in commentsStable.vals()) { comments.add(k, v) };
+    for ((k, v) in categoriesStable.vals()) { categories.add(k, v) };
+    for ((k, v) in friendsStable.vals()) { friends.add(k, v) };
+    for ((k, v) in galleryEventsStable.vals()) { galleryEvents.add(k, v) };
+    for ((k, v) in youtubeVideosStable.vals()) { youtubeVideos.add(k, v) };
+    for ((k, v) in pdfDocumentsStable.vals()) { pdfDocuments.add(k, v) };
+    for ((k, v) in postLikesStable.vals()) { postLikes.add(k, v) };
+    for ((k, v) in userProfilesStable.vals()) { userProfiles.add(k, v) };
+    postsStable := [];
+    commentsStable := [];
+    categoriesStable := [];
+    friendsStable := [];
+    galleryEventsStable := [];
+    youtubeVideosStable := [];
+    pdfDocumentsStable := [];
+    postLikesStable := [];
+    userProfilesStable := [];
+  };
 
   // Admin check helper
   func checkAdmin(caller : Principal) {
@@ -103,13 +156,12 @@ actor {
     if (caller.isAnonymous()) {
       return false;
     };
-    // Clear all existing role assignments
-    for ((principal, _role) in accessControlState.userRoles.entries()) {
+    // Collect keys first to avoid modifying map while iterating
+    let keysToRemove = accessControlState.userRoles.keys().toArray();
+    for (principal in keysToRemove.vals()) {
       accessControlState.userRoles.remove(principal);
     };
-    // Reset the adminAssigned flag
     accessControlState.adminAssigned := false;
-    // Assign caller as admin
     AccessControl.initialize(accessControlState, caller, "first-admin", "first-admin");
     true;
   };
@@ -234,9 +286,10 @@ actor {
     switch (postLikes.get(postId)) {
       case (null) { Runtime.trap("Post not found") };
       case (?likers) {
-        let newLikers = switch (likers.find(func(p) { p == caller })) {
+        let alreadyLiked = likers.find(func(p : Principal) : Bool { p == caller });
+        let newLikers = switch (alreadyLiked) {
           case (null) { likers.concat([caller]) };
-          case (?_) { likers.filter(func(p) { p != caller }) };
+          case (?_) { likers.filter(func(p : Principal) : Bool { p != caller }) };
         };
         let newLikeCount = newLikers.size();
         postLikes.add(postId, newLikers);
@@ -369,5 +422,15 @@ actor {
 
   public query func getAllPDFDocuments() : async [PDFDocument] {
     pdfDocuments.values().toArray();
+  };
+
+  // Social Links - Admin write, public read
+  public query func getSocialLinks() : async SocialLinks {
+    socialLinks;
+  };
+
+  public shared ({ caller }) func updateSocialLinks(facebook : Text, youtube : Text, instagram : Text) : async () {
+    checkAdmin(caller);
+    socialLinks := { facebook; youtube; instagram };
   };
 };
