@@ -37,16 +37,7 @@ module {
     };
   };
 
-  // Returns the role of the caller, defaulting to #guest if not registered (no trap).
   public func getUserRole(state : AccessControlState, caller : Principal) : UserRole {
-    if (caller.isAnonymous()) { return #guest };
-    switch (state.userRoles.get(caller)) {
-      case (?role) { role };
-      case (null) { #guest };
-    };
-  };
-
-  public func getUserRoleStrict(state : AccessControlState, caller : Principal) : UserRole {
     if (caller.isAnonymous()) { return #guest };
     switch (state.userRoles.get(caller)) {
       case (?role) { role };
@@ -57,7 +48,7 @@ module {
   };
 
   public func assignRole(state : AccessControlState, caller : Principal, user : Principal, role : UserRole) {
-    if (not isAdmin(state, caller)) {
+    if (not (isAdmin(state, caller))) {
       Runtime.trap("Unauthorized: Only admins can assign user roles");
     };
     state.userRoles.add(user, role);
@@ -71,9 +62,6 @@ module {
   };
 
   public func isAdmin(state : AccessControlState, caller : Principal) : Bool {
-    switch (state.userRoles.get(caller)) {
-      case (?#admin) { true };
-      case (_) { false };
-    };
+    getUserRole(state, caller) == #admin;
   };
 };

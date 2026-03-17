@@ -781,9 +781,7 @@ function VideosTab() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent data-ocid="admin.videos.dialog">
           <DialogHeader>
-            <DialogTitle>
-              {editVideo ? "Edit YouTube Video" : "Add YouTube Video"}
-            </DialogTitle>
+            <DialogTitle>{editVideo ? "Edit Video" : "Add Video"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
@@ -800,13 +798,13 @@ function VideosTab() {
               />
             </div>
             <div>
-              <Label>YouTube URL *</Label>
+              <Label>Video URL (YouTube or Facebook) *</Label>
               <Input
                 value={form.youtubeUrl}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, youtubeUrl: e.target.value }))
                 }
-                placeholder="https://youtube.com/watch?v=..."
+                placeholder="https://youtube.com/watch?v=... or https://facebook.com/watch/..."
                 data-ocid="admin.videos.url.input"
               />
             </div>

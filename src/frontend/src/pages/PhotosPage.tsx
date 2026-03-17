@@ -78,8 +78,7 @@ export default function PhotosPage() {
                         alt={`${ev.eventName} ${i + 1}`}
                         className="w-full h-full object-cover"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src =
-                            "/assets/generated/gallery-farewell.dim_800x500.jpg";
+                          (e.target as HTMLImageElement).style.display = "none";
                         }}
                       />
                     </motion.button>

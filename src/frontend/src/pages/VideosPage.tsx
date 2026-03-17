@@ -3,15 +3,51 @@ import { Video } from "lucide-react";
 import { motion } from "motion/react";
 import { useGetAllVideos } from "../hooks/useQueries";
 
-function getYouTubeId(url: string): string {
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
-  ];
-  for (const p of patterns) {
-    const m = url.match(p);
-    if (m) return m[1];
+function getYouTubeId(url: string): string | null {
+  const m = url.match(
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+  );
+  return m ? m[1] : null;
+}
+
+function isFacebookVideo(url: string): boolean {
+  return /facebook\.com\/.*video|facebook\.com\/watch|fb\.watch/.test(url);
+}
+
+function VideoEmbed({ url, title }: { url: string; title: string }) {
+  const ytId = getYouTubeId(url);
+  if (ytId) {
+    return (
+      <iframe
+        src={`https://www.youtube.com/embed/${ytId}`}
+        title={title}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+        className="w-full h-full border-0"
+      />
+    );
   }
-  return url;
+  if (isFacebookVideo(url)) {
+    const embedSrc = `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=false&autoplay=false`;
+    return (
+      <iframe
+        src={embedSrc}
+        title={title}
+        allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+        allowFullScreen
+        className="w-full h-full border-0"
+        scrolling="no"
+      />
+    );
+  }
+  return (
+    <iframe
+      src={url}
+      title={title}
+      allowFullScreen
+      className="w-full h-full border-0"
+    />
+  );
 }
 
 export default function VideosPage() {
@@ -54,37 +90,28 @@ export default function VideosPage() {
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
           data-ocid="videos.list"
         >
-          {videos.map((video, i) => {
-            const videoId = getYouTubeId(video.youtubeUrl);
-            return (
-              <motion.div
-                key={video.title}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className="bg-card rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-shadow"
-                data-ocid={`videos.item.${i + 1}`}
-              >
-                <div className="aspect-video w-full overflow-hidden">
-                  <iframe
-                    src={`https://www.youtube.com/embed/${videoId}`}
-                    title={video.title}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    className="w-full h-full border-0"
-                  />
-                </div>
-                <div className="p-4">
-                  <h3 className="font-semibold text-foreground text-sm mb-1 line-clamp-2">
-                    {video.title}
-                  </h3>
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {video.description}
-                  </p>
-                </div>
-              </motion.div>
-            );
-          })}
+          {videos.map((video, i) => (
+            <motion.div
+              key={video.title}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+              className="bg-card rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-shadow"
+              data-ocid={`videos.item.${i + 1}`}
+            >
+              <div className="aspect-video w-full overflow-hidden">
+                <VideoEmbed url={video.youtubeUrl} title={video.title} />
+              </div>
+              <div className="p-4">
+                <h3 className="font-semibold text-foreground text-sm mb-1 line-clamp-2">
+                  {video.title}
+                </h3>
+                <p className="text-xs text-muted-foreground line-clamp-2">
+                  {video.description}
+                </p>
+              </div>
+            </motion.div>
+          ))}
         </div>
       )}
     </main>
