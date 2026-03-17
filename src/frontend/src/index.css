@@ -1,0 +1,68 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0.966 0.013 252;
+    --foreground: 0.195 0.072 249;
+    --card: 1 0 0;
+    --card-foreground: 0.195 0.072 249;
+    --popover: 1 0 0;
+    --popover-foreground: 0.195 0.072 249;
+    --primary: 0.514 0.222 262;
+    --primary-foreground: 1 0 0;
+    --secondary: 0.718 0.194 145;
+    --secondary-foreground: 1 0 0;
+    --muted: 0.935 0.018 252;
+    --muted-foreground: 0.553 0.042 258;
+    --accent: 0.935 0.018 252;
+    --accent-foreground: 0.195 0.072 249;
+    --destructive: 0.577 0.245 27;
+    --destructive-foreground: 1 0 0;
+    --success: 0.597 0.168 145;
+    --success-foreground: 1 0 0;
+    --border: 0.893 0.022 252;
+    --input: 0.893 0.022 252;
+    --ring: 0.514 0.222 262;
+    --radius: 0.5rem;
+    --footer-start: 0.195 0.072 249;
+    --footer-end: 0.278 0.104 249;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-family: "Plus Jakarta Sans", sans-serif;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .hero-overlay {
+    background: linear-gradient(
+      to right,
+      rgba(6, 42, 74, 0.85) 0%,
+      rgba(6, 42, 74, 0.4) 60%,
+      transparent 100%
+    );
+  }
+  .footer-gradient {
+    background: linear-gradient(
+      135deg,
+      oklch(0.195 0.072 249) 0%,
+      oklch(0.278 0.104 249) 100%
+    );
+  }
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-card-hover hover:-translate-y-1;
+  }
+}
