@@ -4,6 +4,7 @@ import { Images, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { useGetAllGalleryEvents } from "../hooks/useQueries";
+import { toDirectImageUrl } from "../utils/imageUrl";
 
 export default function PhotosPage() {
   const { data: events, isLoading } = useGetAllGalleryEvents();
@@ -69,12 +70,12 @@ export default function PhotosPage() {
                       initial={{ opacity: 0, scale: 0.96 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: i * 0.05 }}
-                      onClick={() => setLightbox(url)}
+                      onClick={() => setLightbox(toDirectImageUrl(url))}
                       className="aspect-square overflow-hidden rounded-lg shadow-card hover:shadow-card-hover transition-all duration-200"
                       data-ocid={`photos.item.${i + 1}`}
                     >
                       <img
-                        src={url}
+                        src={toDirectImageUrl(url)}
                         alt={`${ev.eventName} ${i + 1}`}
                         className="w-full h-full object-cover"
                         onError={(e) => {

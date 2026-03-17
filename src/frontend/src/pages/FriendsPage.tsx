@@ -3,6 +3,7 @@ import { Facebook, Phone, UserCircle2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { useGetAllFriends } from "../hooks/useQueries";
+import { toDirectImageUrl } from "../utils/imageUrl";
 
 export default function FriendsPage() {
   const { data: friends, isLoading } = useGetAllFriends();
@@ -60,7 +61,7 @@ export default function FriendsPage() {
                     <UserCircle2 className="w-10 h-10 text-primary/40" />
                   ) : (
                     <img
-                      src={friend.photoUrl}
+                      src={toDirectImageUrl(friend.photoUrl)}
                       alt={friend.name}
                       className="w-full h-full object-cover"
                       onError={() => {

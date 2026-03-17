@@ -75,6 +75,8 @@ actor {
   };
 
   // ── Stable storage (survives upgrades) ──────────────────────────────
+  // adminPrincipal is stable so admin assignment survives every redeploy
+  stable var adminPrincipal : ?Principal = null;
   var postsStable : [(Text, Post)] = [];
   var commentsStable : [(Text, Comment)] = [];
   var categoriesStable : [(Text, Category)] = [];
@@ -84,8 +86,8 @@ actor {
   var pdfDocumentsStable : [(Text, PDFDocument)] = [];
   var postLikesStable : [(Text, [Principal])] = [];
   var userProfilesStable : [(Principal, UserProfile)] = [];
-  var visitorCount : Nat = 0;
-  var socialLinks : SocialLinks = { facebook = ""; youtube = ""; instagram = "" };
+  stable var visitorCount : Nat = 0;
+  stable var socialLinks : SocialLinks = { facebook = ""; youtube = ""; instagram = "" };
 
   // ── Working (non-stable) Maps ────────────────────────────────────────
   let userProfiles = Map.empty<Principal, UserProfile>();
@@ -97,6 +99,17 @@ actor {
   let youtubeVideos = Map.empty<Text, YouTubeVideo>();
   let pdfDocuments = Map.empty<Text, PDFDocument>();
   let postLikes = Map.empty<Text, [Principal]>();
+
+  // Helper: sync stable adminPrincipal back into accessControlState
+  func syncAdminToAccessControl(ap : Principal) {
+    // Clear existing roles first
+    let keysToRemove = accessControlState.userRoles.keys().toArray();
+    for (principal in keysToRemove.vals()) {
+      accessControlState.userRoles.remove(principal);
+    };
+    accessControlState.adminAssigned := false;
+    AccessControl.initialize(accessControlState, ap, "first-admin", "first-admin");
+  };
 
   // ── Upgrade hooks ────────────────────────────────────────────────────
   system func preupgrade() {
@@ -130,21 +143,35 @@ actor {
     pdfDocumentsStable := [];
     postLikesStable := [];
     userProfilesStable := [];
+    // Restore admin from stable storage into accessControlState
+    switch (adminPrincipal) {
+      case (null) {};
+      case (?ap) { syncAdminToAccessControl(ap) };
+    };
   };
 
-  // Admin check helper
+  // Admin check helper - uses stable adminPrincipal for reliability
   func checkAdmin(caller : Principal) {
-    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
-      Runtime.trap("Unauthorized: Only admins can perform this action");
+    switch (adminPrincipal) {
+      case (null) { Runtime.trap("Unauthorized: No admin assigned yet") };
+      case (?ap) {
+        if (caller != ap) {
+          Runtime.trap("Unauthorized: Only admins can perform this action");
+        };
+      };
     };
   };
 
   // Claim admin role - first caller becomes admin (one-time only)
   public shared ({ caller }) func claimAdminRole(_userSecret : Text) : async Bool {
-    if (accessControlState.adminAssigned) {
+    if (adminPrincipal != null) {
       return false;
     };
-    AccessControl.initialize(accessControlState, caller, "first-admin", "first-admin");
+    if (caller.isAnonymous()) {
+      return false;
+    };
+    adminPrincipal := ?caller;
+    syncAdminToAccessControl(caller);
     true;
   };
 
@@ -156,20 +183,15 @@ actor {
     if (caller.isAnonymous()) {
       return false;
     };
-    // Collect keys first to avoid modifying map while iterating
-    let keysToRemove = accessControlState.userRoles.keys().toArray();
-    for (principal in keysToRemove.vals()) {
-      accessControlState.userRoles.remove(principal);
-    };
-    accessControlState.adminAssigned := false;
-    AccessControl.initialize(accessControlState, caller, "first-admin", "first-admin");
+    adminPrincipal := ?caller;
+    syncAdminToAccessControl(caller);
     true;
   };
 
   // User Profile Management
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can access profiles");
+      return null;
     };
     userProfiles.get(caller);
   };
