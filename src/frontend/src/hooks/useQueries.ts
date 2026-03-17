@@ -150,7 +150,7 @@ export function useIsAdmin() {
     queryKey: ["isAdmin"],
     queryFn: async () => {
       if (!actor) return false;
-      return (actor as any).isAdmin() as Promise<boolean>;
+      return actor.isCallerAdmin() as Promise<boolean>;
     },
     enabled: !!actor && !isFetching,
   });

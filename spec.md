@@ -1,25 +1,23 @@
 # HUHS SSC Batch 2023
 
 ## Current State
-The backend uses `let` (non-stable) Map variables — all data is wiped on every redeploy. The `resetAndClaimAdmin` function exists in Motoko but the reset loop modifies the map while iterating, which can fail. The frontend has hardcoded `SAMPLE_*` arrays used as `placeholderData` in every query, causing a flicker where demo data appears before real data loads.
+Full-stack app with Motoko backend and React frontend. Admin panel at `/admin` with claim/reset flow. Backend uses stable variables. All CRUD features implemented.
 
 ## Requested Changes (Diff)
 
 ### Add
-- `stable var` arrays for each data collection (posts, comments, categories, friends, galleryEvents, youtubeVideos, pdfDocuments, postLikes)
-- `system func preupgrade()` to serialize Maps → stable arrays before upgrade
-- `system func postupgrade()` to restore Maps from stable arrays after upgrade
+- Nothing new
 
 ### Modify
-- `var visitorCount` → `stable var visitorCount`
-- `var socialLinks` → `stable var socialLinks`
-- `resetAndClaimAdmin`: fix map-while-iterating pattern by collecting keys first
-- All `useQuery` hooks in `useQueries.ts`: remove `placeholderData: SAMPLE_*` and remove fallback returns of SAMPLE data when actor is nil; return empty arrays / null instead so loading spinners show
-- `useGetPostBySlug`: remove SAMPLE fallback
+- `access-control.mo`: `getUserRole` now returns `#guest` instead of trapping for unregistered users
+- `access-control.mo`: `isAdmin` now uses direct switch on userRoles map (never traps)
+- `access-control.mo`: Added `getUserRoleStrict` for places that need the old trap behavior
+- `hasPermission` now returns false (instead of trapping) for unregistered users trying to access user/admin resources
 
 ### Remove
-- All `SAMPLE_POSTS`, `SAMPLE_FRIENDS`, `SAMPLE_GALLERY`, `SAMPLE_VIDEOS`, `SAMPLE_PDFS`, `SAMPLE_CATEGORIES` exports and their use as fallback / placeholder data
+- Nothing removed
 
 ## Implementation Plan
-1. Update `src/backend/main.mo`: stable vars, preupgrade/postupgrade, fix resetAndClaimAdmin iteration
-2. Update `src/frontend/src/hooks/useQueries.ts`: strip all SAMPLE data and placeholder fallbacks, queries return [] / null when actor unavailable
+1. Fix `access-control.mo` so `isCallerAdmin()` and `isAdmin()` never trap for unknown principals -- return false instead
+2. Keep strict checking available via `getUserRoleStrict` for explicit error paths
+3. Deploy
