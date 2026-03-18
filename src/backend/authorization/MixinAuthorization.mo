@@ -24,7 +24,6 @@ mixin (accessControlState : AccessControl.AccessControlState) {
     AccessControl.assignRole(accessControlState, caller, user, role);
   };
 
-  public query ({ caller }) func isCallerAdmin() : async Bool {
-    AccessControl.isAdmin(accessControlState, caller);
-  };
+  // isCallerAdmin is intentionally omitted here so main.mo can override it
+  // to use the stable adminPrincipal variable directly.
 };

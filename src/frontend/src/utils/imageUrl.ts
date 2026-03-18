@@ -15,12 +15,17 @@ export function toDirectImageUrl(url: string): string {
     return `https://drive.google.com/thumbnail?id=${driveOpenMatch[1]}&sz=w1000`;
   }
 
-  // Imgur: https://imgur.com/abc123 -> https://i.imgur.com/abc123.jpg
+  // Imgur: handle share pages (imgur.com/ID or imgur.com/ID.ext)
+  // Skip already-direct i.imgur.com URLs
+  if (/^https?:\/\/i\.imgur\.com\//.test(url)) {
+    return url;
+  }
   const imgurMatch = url.match(
-    /^https?:\/\/(?:www\.)?imgur\.com\/([a-zA-Z0-9]+)$/,
+    /^https?:\/\/(?:www\.)?imgur\.com\/([a-zA-Z0-9]+)(?:\.[a-zA-Z]+)?(?:[?#].*)?$/,
   );
   if (imgurMatch) {
-    return `https://i.imgur.com/${imgurMatch[1]}.jpg`;
+    // Use .jpeg — Imgur serves all image types under this extension
+    return `https://i.imgur.com/${imgurMatch[1]}.jpeg`;
   }
 
   return url;

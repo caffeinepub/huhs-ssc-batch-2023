@@ -77,15 +77,15 @@ actor {
   // ── Stable storage (survives upgrades) ──────────────────────────────
   // adminPrincipal is stable so admin assignment survives every redeploy
   stable var adminPrincipal : ?Principal = null;
-  var postsStable : [(Text, Post)] = [];
-  var commentsStable : [(Text, Comment)] = [];
-  var categoriesStable : [(Text, Category)] = [];
-  var friendsStable : [(Text, Friend)] = [];
-  var galleryEventsStable : [(Text, GalleryEvent)] = [];
-  var youtubeVideosStable : [(Text, YouTubeVideo)] = [];
-  var pdfDocumentsStable : [(Text, PDFDocument)] = [];
-  var postLikesStable : [(Text, [Principal])] = [];
-  var userProfilesStable : [(Principal, UserProfile)] = [];
+  stable var postsStable : [(Text, Post)] = [];
+  stable var commentsStable : [(Text, Comment)] = [];
+  stable var categoriesStable : [(Text, Category)] = [];
+  stable var friendsStable : [(Text, Friend)] = [];
+  stable var galleryEventsStable : [(Text, GalleryEvent)] = [];
+  stable var youtubeVideosStable : [(Text, YouTubeVideo)] = [];
+  stable var pdfDocumentsStable : [(Text, PDFDocument)] = [];
+  stable var postLikesStable : [(Text, [Principal])] = [];
+  stable var userProfilesStable : [(Principal, UserProfile)] = [];
   stable var visitorCount : Nat = 0;
   stable var socialLinks : SocialLinks = { facebook = ""; youtube = ""; instagram = "" };
 
@@ -161,6 +161,15 @@ actor {
       };
     };
   };
+
+  // Override isCallerAdmin to use stable adminPrincipal directly (never traps)
+  public query ({ caller }) func isCallerAdmin() : async Bool {
+    switch (adminPrincipal) {
+      case (?ap) { caller == ap };
+      case (null) { false };
+    };
+  };
+
   // Claim admin role - first caller becomes admin (one-time only)
   public shared ({ caller }) func claimAdminRole(_userSecret : Text) : async Bool {
     if (adminPrincipal != null) {
@@ -189,22 +198,28 @@ actor {
 
   // User Profile Management
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      return null;
-    };
     userProfiles.get(caller);
   };
 
   public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
-    if (caller != user and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only view your own profile");
+    if (caller != user) {
+      switch (adminPrincipal) {
+        case (?ap) {
+          if (caller != ap) {
+            Runtime.trap("Unauthorized: Can only view your own profile");
+          };
+        };
+        case (null) {
+          Runtime.trap("Unauthorized: Can only view your own profile");
+        };
+      };
     };
     userProfiles.get(user);
   };
 
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can save profiles");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be logged in to save profile");
     };
     userProfiles.add(caller, profile);
   };
@@ -271,23 +286,27 @@ actor {
     );
   };
 
-  // Comments
+  // Comments - any logged-in user
   public shared ({ caller }) func addComment(postId : Text, authorId : Text, body : Text) : async () {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can add comments");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be logged in to comment");
     };
     let commentId = postId # "-" # Time.now().toText();
     comments.add(commentId, { id = commentId; postId; authorId; body; createdAt = Time.now() });
   };
 
   public shared ({ caller }) func deleteComment(commentId : Text) : async () {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can delete comments");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be logged in");
     };
     switch (comments.get(commentId)) {
       case (null) { Runtime.trap("Comment not found") };
       case (?comment) {
-        if (comment.authorId != caller.toText() and not AccessControl.isAdmin(accessControlState, caller)) {
+        let isAdmin = switch (adminPrincipal) {
+          case (?ap) { caller == ap };
+          case (null) { false };
+        };
+        if (comment.authorId != caller.toText() and not isAdmin) {
           Runtime.trap("Unauthorized: Can only delete your own comments");
         };
         comments.remove(commentId);
@@ -299,10 +318,10 @@ actor {
     comments.values().toArray().filter(func(c) { c.postId == postId });
   };
 
-  // Likes
+  // Likes - any logged-in user
   public shared ({ caller }) func toggleLike(postId : Text) : async Nat {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can like posts");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be logged in to like posts");
     };
     switch (postLikes.get(postId)) {
       case (null) { Runtime.trap("Post not found") };

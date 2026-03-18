@@ -4,8 +4,10 @@ import { motion } from "motion/react";
 import { useGetAllVideos } from "../hooks/useQueries";
 
 function getYouTubeId(url: string): string | null {
+  // Handles: youtube.com/watch?v=ID, youtu.be/ID, youtube.com/embed/ID,
+  // youtube.com/shorts/ID, and watch URLs with playlist params (?list=...&v=ID)
   const m = url.match(
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+    /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
   );
   return m ? m[1] : null;
 }
